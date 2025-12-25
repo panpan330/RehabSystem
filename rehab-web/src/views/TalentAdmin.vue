@@ -77,7 +77,7 @@
           <div id="radarChart" style="width: 300px; height: 300px;"></div>
         </el-card>
 
-        <el-card shadow="never" :body-style="{ padding: '0px' }" style="border: 2px solid #409EFF; position: relative;">
+        <el-card shadow="never" :body-style="{ padding: '0px' }" style="width: 300px; border: 2px solid #409EFF; position: relative;">
            <ThreeBody :csScore="currentTalent.csScore" :medScore="currentTalent.medScore" />
            <div style="position: absolute; bottom: 0; width: 100%; text-align: center; padding: 8px 0; background: rgba(64,158,255,0.1); color: #409EFF; font-size: 12px; font-weight: bold;">
              🔵 蓝臂: 工程实践 | 🔴 红头: 医学理论
@@ -142,7 +142,6 @@ import { Download, Plus, Refresh } from '@element-plus/icons-vue'
 import ThreeBody from '../components/ThreeBody.vue' 
 import { exportToPDF } from '../utils/pdfExport'
 
-// --- 数据状态 ---
 const tableData = ref([])
 const loading = ref(false)
 const addDialogVisible = ref(false)
@@ -159,7 +158,6 @@ const getTagType = (role) => {
   return ''
 }
 
-// --- 数据接口 ---
 const fetchData = async () => {
   loading.value = true
   try {
@@ -187,9 +185,7 @@ const handleDelete = async (id) => {
 const showRadar = (row) => { currentTalent.value = row; dialogVisible.value = true; fetchTraining(row.id) }
 const handleExport = () => { ElMessage.success('正在生成 PDF...'); exportToPDF('report-content', `${currentTalent.value.name}-能力画像报告`) }
 
-// --- AI 逻辑与图表 ---
 const generateReport = (cs, med) => {
-  // 简化的阈值判断逻辑
   if (cs > 70 && med > 70) {
     analysisReport.value = { type: '🌟 卓越交叉型人才', colorType: 'success', summary: '双强精英', strength: '医工双修', weakness: '无', courses: ['科研项目管理'] }
   } else if (cs > med + 20) {
@@ -207,11 +203,9 @@ const initChart = async () => {
   if (chartDom) {
     if (myChart) myChart.dispose();
     myChart = echarts.init(chartDom);
-    
     const cs = currentTalent.value.csScore || 0
     const med = currentTalent.value.medScore || 0
     generateReport(cs, med)
-
     myChart.setOption({
       radar: { indicator: [{name:'编程(CS)', max:100}, {name:'数据(CS)', max:100}, {name:'交叉', max:100}, {name:'评估(Med)', max:100}, {name:'理论(Med)', max:100}, {name:'沟通(Med)', max:100}] },
       series: [{ type: 'radar', data: [{ value: [cs, cs*0.9, (cs+med)/2, med, med*0.9, med*0.8] }] }]

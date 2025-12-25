@@ -1,144 +1,218 @@
 <template>
-  <div ref="threeContainer" class="three-container"></div>
+  <div ref="containerRef" class="three-container">
+    <div v-if="!isReady" class="loading-mask">
+      <div class="loading-spinner"></div>
+      <p>正在生成 3D 模型...</p>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, toRefs } from 'vue'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 
+// 接收父组件传来的分数
 const props = defineProps({
-  csScore: { type: Number, default: 0 },
-  medScore: { type: Number, default: 0 }
+  csScore: { type: Number, default: 50 },
+  medScore: { type: Number, default: 50 }
 })
 
-const threeContainer = ref(null)
+const { csScore, medScore } = toRefs(props)
+const containerRef = ref(null)
+const isReady = ref(false)
+
 let scene, camera, renderer, animationId
-let robot = {} // 存储身体各部位
+let headMesh, rightArmMesh, group
 
-// 初始化 3D 场景
+// --- 材质定义 (高对比度) ---
+// 蓝色材质 (代表 CS)
+const blueMaterial = new THREE.MeshPhongMaterial({
+  color: 0x409EFF,
+  emissive: 0x002244,
+  specular: 0xffffff,
+  shininess: 30
+})
+// 红色材质 (代表 医学)
+const redMaterial = new THREE.MeshPhongMaterial({
+  color: 0xF56C6C,
+  emissive: 0x440000,
+  specular: 0xffffff,
+  shininess: 30
+})
+// 基础灰色材质
+const baseMaterial = new THREE.MeshPhongMaterial({
+  color: 0x909399,
+  flatShading: false
+})
+
 const initThree = () => {
-  // 1. 场景与相机
+  if (!containerRef.value) return
+  
+  const width = containerRef.value.clientWidth
+  const height = containerRef.value.clientHeight
+
+  // 如果容器还没被撑开，暂不渲染，等待 ResizeObserver 触发
+  if (width === 0 || height === 0) return 
+  if (renderer) return // 防止重复初始化
+
+  // 1. 创建场景
   scene = new THREE.Scene()
-  scene.background = new THREE.Color('#f0f2f5') // 背景色与网页一致
+  // ⭐ 设置浅灰色背景，不再使用透明，确保能看见！
+  scene.background = new THREE.Color(0xf0f2f5) 
 
-  camera = new THREE.PerspectiveCamera(50, 350 / 350, 0.1, 1000)
-  camera.position.set(0, 2, 6)
+  // 2. 创建相机
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000)
+  camera.position.set(0, 1.5, 6) // 相机位置
 
-  // 2. 渲染器
+  // 3. 创建渲染器
   renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(350, 350) // 画布大小
-  threeContainer.value.appendChild(renderer.domElement)
+  renderer.setSize(width, height)
+  renderer.setPixelRatio(window.devicePixelRatio)
+  renderer.shadowMap.enabled = true
+  containerRef.value.appendChild(renderer.domElement)
 
-  // 3. 灯光
+  // 4. 添加灯光
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
   scene.add(ambientLight)
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8)
+  
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0)
   dirLight.position.set(5, 10, 7)
+  dirLight.castShadow = true
   scene.add(dirLight)
 
-  // 4. 创建机器人 (简单的几何体拼接)
-  createRobot()
+  // 5. 构建人体模型
+  buildHuman()
+  
+  // 6. 根据初始分数上色
+  updateColors()
 
-  // 5. 控制器 (允许鼠标拖拽)
-  new OrbitControls(camera, renderer.domElement)
-
-  // 6. 开始动画循环
+  isReady.value = true
   animate()
 }
 
-// 创建赛博机器人
-const createRobot = () => {
-  const material = new THREE.MeshStandardMaterial({ color: 0xcccccc })
+const buildHuman = () => {
+  group = new THREE.Group()
+
+  // 头部 (球体)
+  const headGeo = new THREE.SphereGeometry(0.5, 32, 32)
+  headMesh = new THREE.Mesh(headGeo, baseMaterial.clone())
+  headMesh.position.y = 2.6
+  headMesh.castShadow = true
+  group.add(headMesh)
+
+  // 躯干 (圆柱)
+  const torsoGeo = new THREE.CylinderGeometry(0.3, 0.5, 1.6, 32)
+  const torsoMesh = new THREE.Mesh(torsoGeo, baseMaterial)
+  torsoMesh.position.y = 1.4
+  torsoMesh.castShadow = true
+  group.add(torsoMesh)
+
+  // 右臂 (CS能力 - 画面左侧)
+  const armGeo = new THREE.CapsuleGeometry(0.15, 1.2, 4, 8)
+  rightArmMesh = new THREE.Mesh(armGeo, baseMaterial.clone())
+  rightArmMesh.position.set(-0.7, 1.6, 0)
+  rightArmMesh.rotation.z = 0.3
+  rightArmMesh.castShadow = true
+  group.add(rightArmMesh)
+
+  // 左臂 (普通)
+  const leftArm = new THREE.Mesh(armGeo, baseMaterial)
+  leftArm.position.set(0.7, 1.6, 0)
+  leftArm.rotation.z = -0.3
+  leftArm.castShadow = true
+  group.add(leftArm)
   
-  // --- 头部 (代表医学/理论) ---
-  const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8)
-  robot.head = new THREE.Mesh(headGeo, material.clone())
-  robot.head.position.y = 1.8
-  scene.add(robot.head)
+  // 底部底座 (增加稳定性感)
+  const planeGeo = new THREE.CylinderGeometry(1, 1, 0.1, 32)
+  const planeMesh = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({ color: 0xffffff }))
+  planeMesh.position.y = -0.05
+  planeMesh.receiveShadow = true
+  group.add(planeMesh)
 
-  // --- 身体 ---
-  const bodyGeo = new THREE.CylinderGeometry(0.6, 0.4, 2, 32)
-  robot.body = new THREE.Mesh(bodyGeo, material)
-  robot.body.position.y = 0.5
-  scene.add(robot.body)
-
-  // --- 右手 (代表计算机/实操) ---
-  const armGeo = new THREE.CylinderGeometry(0.15, 0.15, 1.2)
-  robot.rightArm = new THREE.Mesh(armGeo, material.clone())
-  robot.rightArm.position.set(-0.9, 1, 0)
-  robot.rightArm.rotation.z = Math.PI / 4 // 抬起手
-  scene.add(robot.rightArm)
-
-  // --- 左手 ---
-  robot.leftArm = robot.rightArm.clone()
-  robot.leftArm.position.set(0.9, 1, 0)
-  robot.leftArm.rotation.z = -Math.PI / 4
-  scene.add(robot.leftArm)
-
-  // --- 核心底座 ---
-  const baseGeo = new THREE.CylinderGeometry(1, 1, 0.2, 32)
-  const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({ color: 0x409EFF }))
-  baseMesh.position.y = -1
-  scene.add(baseMesh)
-  
-  // 初始化颜色
-  updateColors()
+  group.position.y = -1.0
+  scene.add(group)
 }
 
-// 根据分数改变颜色 (高光逻辑)
 const updateColors = () => {
-  if (!robot.head) return
+  if (!headMesh || !rightArmMesh) return
 
-  // 逻辑：医学分高 -> 头部发红光 (脑力强)
-  if (props.medScore > 80) {
-    robot.head.material.color.set(0xF56C6C)
-    robot.head.material.emissive.set(0x550000)
+  // 逻辑：如果分数 > 60 则高亮，否则灰色
+  // 头部 (医学)
+  if (medScore.value > 60) {
+    headMesh.material = redMaterial
   } else {
-    robot.head.material.color.set(0xcccccc)
-    robot.head.material.emissive.set(0x000000)
+    headMesh.material = baseMaterial
   }
 
-  // 逻辑：计算机分高 -> 右手发蓝光 (麒麟臂)
-  if (props.csScore > 80) {
-    robot.rightArm.material.color.set(0x409EFF)
-    robot.rightArm.material.emissive.set(0x000055)
+  // 手臂 (CS)
+  if (csScore.value > 60) {
+    rightArmMesh.material = blueMaterial
   } else {
-    robot.rightArm.material.color.set(0xcccccc)
-    robot.rightArm.material.emissive.set(0x000000)
+    rightArmMesh.material = baseMaterial
   }
 }
 
-// 动画循环
 const animate = () => {
   animationId = requestAnimationFrame(animate)
-  // 缓慢旋转展示
-  if (robot.body) {
-    scene.rotation.y += 0.005
-  }
+  if (group) group.rotation.y += 0.01 // 自动旋转
   renderer.render(scene, camera)
 }
 
-// 监听分数变化，实时变色
-watch(() => [props.csScore, props.medScore], updateColors)
+watch([csScore, medScore], updateColors)
 
 onMounted(() => {
-  initThree()
+  // ⭐ 使用 ResizeObserver 监听容器大小变化
+  // 这是解决 el-dialog 中 Canvas 宽度为 0 的核心方法
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const w = entry.contentRect.width
+      const h = entry.contentRect.height
+      
+      if (w > 0 && h > 0) {
+        if (!renderer) {
+          initThree() // 第一次有宽度时初始化
+        } else {
+          // 后续变化调整大小
+          camera.aspect = w / h
+          camera.updateProjectionMatrix()
+          renderer.setSize(w, h)
+        }
+      }
+    }
+  })
+  if (containerRef.value) observer.observe(containerRef.value)
 })
 
 onBeforeUnmount(() => {
-  // 清理内存，防止卡顿
   cancelAnimationFrame(animationId)
-  renderer.dispose()
+  if (renderer) {
+    renderer.dispose()
+    renderer.forceContextLoss()
+  }
 })
 </script>
 
 <style scoped>
 .three-container {
-  width: 350px;
-  height: 350px;
-  border-radius: 8px;
+  /* ⭐ 强制高度，防止塌陷 */
+  height: 400px !important; 
+  width: 100%;
+  position: relative;
   overflow: hidden;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.1); /* 内阴影增加科技感 */
+  border-radius: 4px;
+  background-color: #f0f2f5; /* 灰色背景确保对比度 */
 }
+
+.loading-mask {
+  position: absolute; top:0; left:0; right:0; bottom:0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  background: #f0f2f5;
+  z-index: 10;
+}
+.loading-spinner {
+  width: 30px; height: 30px; border: 3px solid #ccc; 
+  border-top-color: #409EFF; border-radius: 50%;
+  animation: spin 1s linear infinite; margin-bottom: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
