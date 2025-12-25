@@ -1,263 +1,179 @@
 <template>
   <div class="login-container">
-    <canvas id="particle-canvas"></canvas>
     <div class="login-box">
-      <div class="header">
-        <div class="logo">🏥</div>
-        <div class="title">
-          <h2>康复人才智脑</h2>
-          <p>Interdisciplinary Talent Intelligence System</p>
-        </div>
+      <div class="login-header">
+        <img src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" alt="logo" class="logo">
+        <div class="title">康复人才智脑</div>
+        <div class="subtitle">INTERDISCIPLINARY TALENT INTELLIGENCE SYSTEM</div>
       </div>
-
+      
       <el-form :model="form" class="login-form">
         <el-form-item>
-          <el-input 
-            v-model="form.username" 
-            placeholder="请输入账号 (admin)" 
-            :prefix-icon="User"
-            size="large"
-          />
+          <el-input v-model="form.username" placeholder="请输入账号" :prefix-icon="User" size="large" />
         </el-form-item>
         <el-form-item>
-          <el-input 
-            v-model="form.password" 
-            type="password" 
-            placeholder="请输入密码 (123456)" 
-            :prefix-icon="Lock"
-            show-password
-            size="large"
-            @keyup.enter="handleLogin"
-          />
+          <el-input v-model="form.password" type="password" placeholder="请输入密码" :prefix-icon="Lock" show-password size="large" />
         </el-form-item>
-        
-        <el-button 
-          type="primary" 
-          class="login-btn" 
-          :loading="loading" 
-          @click="handleLogin"
-          size="large"
-        >
-          🚀 立即进入系统
-        </el-button>
-
-        <div class="tips">
-          <span>演示账号: admin / 123456</span>
-          <span style="margin-left: 10px;">教师账号: teacher / 123456</span>
-        </div>
+        <el-form-item>
+          <el-button type="primary" class="login-btn" size="large" :loading="loading" @click="handleLogin">
+            🚀 立即进入系统
+          </el-button>
+        </el-form-item>
       </el-form>
+      
+      <div class="footer-text">演示账号: admin / 123456</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router' // ⭐ 引入路由钩子
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
+import request from '../utils/request'
+import { ElMessage } from 'element-plus'
 
-const router = useRouter() // ⭐ 初始化路由
+const router = useRouter()
 const loading = ref(false)
-const form = ref({ username: '', password: '' })
+const form = ref({
+  username: '',
+  password: ''
+})
 
-const handleLogin = async () => {
+const handleLogin = () => {
   if (!form.value.username || !form.value.password) {
-    return ElMessage.warning('请输入账号密码')
+    ElMessage.warning('请输入账号和密码')
+    return
   }
-  
+
   loading.value = true
-  try {
-    const res = await axios.post('http://localhost:9090/api/user/login', form.value)
-    
-    if (res.data.code === 200) {
-      ElMessage.success('登录成功，欢迎回来！')
+  
+  request.post('/api/user/login', form.value).then(res => {
+    // ⭐⭐⭐ 核心修复：这里必须改成 '200' ⭐⭐⭐
+    if (res.code === '200') {
+      ElMessage.success('登录成功') // 这次是真的成功绿框了
+
+      const { token, userInfo } = res.data
       
-      // 1. 保存 Token
-      const token = res.data.token || ('mock-token-' + Date.now())
+      // 存 Token
       localStorage.setItem('token', token)
-      
-      // 2. 保存用户信息 (必须保存，layout需要用到)
-      const userData = res.data.userInfo || { name: form.value.username, role: 'GUEST' }
-      localStorage.setItem('userInfo', JSON.stringify(userData))
-      
-      // ⭐ 3. 路由跳转 (根据角色跳转不同页面)
-      if (userData.role === 'STUDENT') {
-        router.push('/personal')
-      } else {
-        router.push('/dashboard') // 管理员/教师跳仪表盘
-      }
+      // 存用户信息
+      localStorage.setItem('user', JSON.stringify(userInfo))
+
+      // 跳转 (确保你的路由里有 path: '/')
+      router.push('/') 
 
     } else {
-      ElMessage.error(res.data.msg || '登录失败')
+      // 如果不是 200，才是真正的错误
+      ElMessage.error(res.msg || '登录失败')
     }
-  } catch (e) {
-    console.error(e)
-    ElMessage.error('连接服务器失败')
-  } finally {
+  }).catch(err => {
+    console.error(err)
+    ElMessage.error('系统接口连接异常')
+  }).finally(() => {
     loading.value = false
-  }
+  })
 }
-
-// --- 以下是粒子特效代码 (保持不变) ---
-let canvas, ctx, animationFrameId
-let particles = []
-
-const initParticles = () => {
-  canvas = document.getElementById('particle-canvas')
-  if (!canvas) return
-  ctx = canvas.getContext('2d')
-  resizeCanvas()
-  
-  const particleCount = 80 
-  for (let i = 0; i < particleCount; i++) {
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5,
-      size: Math.random() * 2 + 1
-    })
-  }
-  animate()
-  window.addEventListener('resize', resizeCanvas)
-}
-
-const resizeCanvas = () => {
-  if (canvas) {
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-  }
-}
-
-const animate = () => {
-  if (!ctx) return
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  for (let i = 0; i < particles.length; i++) {
-    let p = particles[i]
-    p.x += p.vx
-    p.y += p.vy
-    if (p.x < 0 || p.x > canvas.width) p.vx *= -1
-    if (p.y < 0 || p.y > canvas.height) p.vy *= -1
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(100, 200, 255, 0.5)'
-    ctx.fill()
-    for (let j = i + 1; j < particles.length; j++) {
-      let p2 = particles[j]
-      let dist = Math.sqrt((p.x - p2.x) ** 2 + (p.y - p2.y) ** 2)
-      if (dist < 150) {
-        ctx.beginPath()
-        ctx.strokeStyle = `rgba(100, 200, 255, ${1 - dist / 150})`
-        ctx.lineWidth = 0.5
-        ctx.moveTo(p.x, p.y)
-        ctx.lineTo(p2.x, p2.y)
-        ctx.stroke()
-      }
-    }
-  }
-  animationFrameId = requestAnimationFrame(animate)
-}
-
-onMounted(() => { initParticles() })
-onBeforeUnmount(() => {
-  cancelAnimationFrame(animationFrameId)
-  window.removeEventListener('resize', resizeCanvas)
-})
 </script>
 
 <style scoped>
-/* 样式保持原样 */
+/* 保持原本漂亮的深色样式 */
 .login-container {
-  position: relative;
-  width: 100vw;
   height: 100vh;
-  overflow: hidden;
-  background: radial-gradient(circle at center, #1b2735 0%, #090a0f 100%);
   display: flex;
   justify-content: center;
   align-items: center;
-}
-#particle-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
-.login-box {
+  background: #0f172a; /* 深色背景 */
+  background-image: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
   position: relative;
-  z-index: 10;
+  overflow: hidden;
+}
+
+/* 增加一点科技感的背景网格线 */
+.login-container::before {
+  content: "";
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.login-box {
   width: 420px;
   padding: 40px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(30, 41, 59, 0.7);
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-  color: #fff;
-  transition: transform 0.3s;
-}
-.login-box:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(0, 100, 255, 0.15);
-}
-.header {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  z-index: 10;
   text-align: center;
+}
+
+.login-header {
   margin-bottom: 30px;
 }
+
 .logo {
-  font-size: 48px;
-  margin-bottom: 10px;
-  animation: float 3s ease-in-out infinite;
+  width: 60px;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 0 10px rgba(64, 158, 255, 0.5));
 }
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
-}
-.title h2 {
-  margin: 0;
+
+.title {
   font-size: 28px;
-  font-weight: 600;
-  background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: bold;
+  color: #f1f5f9;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
 }
-.title p {
-  margin: 5px 0 0;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  text-transform: uppercase;
+
+.subtitle {
+  font-size: 10px;
+  color: #94a3b8;
   letter-spacing: 1px;
+  text-transform: uppercase;
 }
-.login-form .el-input {
-  --el-input-bg-color: rgba(0, 0, 0, 0.2);
-  --el-input-border-color: rgba(255, 255, 255, 0.1);
-  --el-input-text-color: #fff;
-  --el-input-placeholder-color: rgba(255, 255, 255, 0.4);
-  --el-input-hover-border-color: #409EFF;
-  --el-input-focus-border-color: #409EFF;
+
+.login-form {
+  margin-top: 20px;
 }
+
 .login-btn {
   width: 100%;
-  margin-top: 10px;
-  background: linear-gradient(90deg, #409EFF 0%, #36d1dc 100%);
-  border: none;
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  border: none;
   transition: all 0.3s;
 }
+
 .login-btn:hover {
-  opacity: 0.9;
-  transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(6, 182, 212, 0.4);
 }
-.tips {
+
+.footer-text {
   margin-top: 20px;
-  text-align: center;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #64748b;
+}
+
+/* 覆盖 Element 输入框样式适配深色主题 */
+:deep(.el-input__wrapper) {
+  background-color: rgba(15, 23, 42, 0.6);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+:deep(.el-input__inner) {
+  color: #e2e8f0;
+}
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #3b82f6 inset;
 }
 </style>
