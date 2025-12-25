@@ -52,11 +52,12 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router' // ⭐ 引入路由钩子
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 
-const emit = defineEmits(['login-success'])
+const router = useRouter() // ⭐ 初始化路由
 const loading = ref(false)
 const form = ref({ username: '', password: '' })
 
@@ -69,19 +70,23 @@ const handleLogin = async () => {
   try {
     const res = await axios.post('http://localhost:9090/api/user/login', form.value)
     
-    // 注意：这里根据你提供的 JSON，code 是在最外层
     if (res.data.code === 200) {
       ElMessage.success('登录成功，欢迎回来！')
       
-      // 保存 Token (从返回结果里拿，或者模拟)
+      // 1. 保存 Token
       const token = res.data.token || ('mock-token-' + Date.now())
       localStorage.setItem('token', token)
       
-      // ⭐【关键修改】这里改成 res.data.userInfo
-      // 只有这样才能拿到后端返回的 { role: "ADMIN", ... }
+      // 2. 保存用户信息 (必须保存，layout需要用到)
       const userData = res.data.userInfo || { name: form.value.username, role: 'GUEST' }
+      localStorage.setItem('userInfo', JSON.stringify(userData))
       
-      emit('login-success', userData)
+      // ⭐ 3. 路由跳转 (根据角色跳转不同页面)
+      if (userData.role === 'STUDENT') {
+        router.push('/personal')
+      } else {
+        router.push('/dashboard') // 管理员/教师跳仪表盘
+      }
 
     } else {
       ElMessage.error(res.data.msg || '登录失败')
@@ -94,7 +99,7 @@ const handleLogin = async () => {
   }
 }
 
-// ... 粒子特效代码保持不变 ...
+// --- 以下是粒子特效代码 (保持不变) ---
 let canvas, ctx, animationFrameId
 let particles = []
 
@@ -162,7 +167,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 样式保持不变，太长省略，请直接保留你原来的样式 */
+/* 样式保持原样 */
 .login-container {
   position: relative;
   width: 100vw;
