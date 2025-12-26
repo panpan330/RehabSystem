@@ -331,15 +331,36 @@ const initChart = async () => {
   }
 }
 
+// ... 其他代码不变
+
 const assignTraining = async () => {
-  if (analysisReport.value.courses.length === 0) return;
-  const payload = analysisReport.value.courses.map(course => ({ talentId: currentTalent.value.id, courseName: course }))
-  try { 
-      await request.post('/api/training/assign', payload)
-      ElMessage.success('指派成功')
-      fetchTraining(currentTalent.value.id) 
-  } catch(e){}
+  if (analysisReport.value.courses.length === 0) {
+      ElMessage.info('当前没有推荐课程，请先调整分数');
+      return;
+  }
+  
+  try {
+    // ⭐ 关键：调用后端 AI 接口
+    const res = await request.post(`/api/training/auto-assign/${currentTalent.value.id}`)
+    
+    if (res.code === '200') {
+        const courses = res.data
+        if (courses && courses.length > 0) {
+            ElMessage.success(`AI 已智能指派 ${courses.length} 门课程！`)
+        } else {
+            ElMessage.info('该人才已拥有推荐的课程，无需重复指派')
+        }
+        // 刷新列表
+        fetchTraining(currentTalent.value.id)
+    } else {
+        ElMessage.error(res.msg)
+    }
+  } catch(e){
+      console.error(e)
+      ElMessage.error('指派失败')
+  }
 }
+// ...
 
 onMounted(() => { fetchData() })
 </script>
