@@ -5,7 +5,17 @@
       <template #header>
         <div class="card-header">
           <span style="font-weight: bold;">人才数据库</span>
-          <div>
+          <div style="display: flex; gap: 10px;">
+            <el-upload
+              action="http://localhost:9090/api/excel/import/talent"
+              :show-file-list="false"
+              :on-success="handleUploadSuccess"
+              :on-error="handleUploadError"
+              accept=".xlsx, .xls"
+            >
+              <el-button type="primary" plain :icon="Upload">导入Excel</el-button>
+            </el-upload>
+
             <el-button type="warning" :icon="Download" @click="exportTalentExcel">导出Excel</el-button>
             <el-button type="success" :icon="Plus" @click="openAddDialog">新增人才</el-button>
             <el-button type="primary" :icon="Refresh" @click="fetchData">刷新数据</el-button>
@@ -195,7 +205,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import request from '../utils/request'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-import { Download, Plus, Refresh } from '@element-plus/icons-vue'
+import { Download, Plus, Refresh, Upload } from '@element-plus/icons-vue' // ⭐ 记得引入 Upload 图标
 import ThreeBody from '../components/ThreeBody.vue' 
 import { exportToPDF } from '../utils/pdfExport'
 
@@ -204,10 +214,9 @@ const loading = ref(false)
 const formDialogVisible = ref(false)
 const isEditMode = ref(false)
 
-// ⭐ 记得在表单对象里加上新字段
 const form = ref({ 
     id: null, name: '', gender: '男', birthday: '', 
-    idCard: '', address: '', // 新增字段
+    idCard: '', address: '',
     education: '本科', major: '', phone: '', email: '',
     role: 'STUDENT', csScore: 50, medScore: 50 
 })
@@ -251,9 +260,23 @@ const fetchTraining = async (talentId) => {
 
 const exportTalentExcel = () => { window.location.href = 'http://localhost:9090/api/excel/export/talent' }
 
+// ⭐ 新增：上传成功回调
+const handleUploadSuccess = (res) => {
+  if (res.code === '200') {
+    ElMessage.success('导入成功！')
+    fetchData() // 刷新列表
+  } else {
+    ElMessage.error('导入失败: ' + res.msg)
+  }
+}
+
+// ⭐ 新增：上传失败回调
+const handleUploadError = () => {
+  ElMessage.error('上传网络错误')
+}
+
 const openAddDialog = () => { 
     isEditMode.value = false
-    // 清空表单时也要清空新字段
     form.value = { 
         id: null, name: '', gender: '男', birthday: '', 
         idCard: '', address: '',
@@ -331,8 +354,6 @@ const initChart = async () => {
   }
 }
 
-// ... 其他代码不变
-
 const assignTraining = async () => {
   if (analysisReport.value.courses.length === 0) {
       ElMessage.info('当前没有推荐课程，请先调整分数');
@@ -340,7 +361,6 @@ const assignTraining = async () => {
   }
   
   try {
-    // ⭐ 关键：调用后端 AI 接口
     const res = await request.post(`/api/training/auto-assign/${currentTalent.value.id}`)
     
     if (res.code === '200') {
@@ -350,7 +370,6 @@ const assignTraining = async () => {
         } else {
             ElMessage.info('该人才已拥有推荐的课程，无需重复指派')
         }
-        // 刷新列表
         fetchTraining(currentTalent.value.id)
     } else {
         ElMessage.error(res.msg)
@@ -360,7 +379,6 @@ const assignTraining = async () => {
       ElMessage.error('指派失败')
   }
 }
-// ...
 
 onMounted(() => { fetchData() })
 </script>
