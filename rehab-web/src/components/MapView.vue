@@ -3,8 +3,10 @@
     <el-card shadow="never" class="map-card">
       <template #header>
         <div class="card-header">
-          <span>🌍 人才时空分布图 (模拟数据演示)</span>
-          <el-tag type="success">实时监控</el-tag>
+          <span>🌍 人才时空分布图 (实时数据库)</span>
+          <div>
+            <el-button type="primary" size="small" @click="fetchData">🔄 刷新位置</el-button>
+          </div>
         </div>
       </template>
       <div id="chinaMap" style="width: 100%; height: 600px;"></div>
@@ -15,109 +17,94 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
-// 引入中国地图数据 (需要先安装 npm install echarts-extension-amap 或者直接引入 json)
-// 为了最简单，我们使用在线 JSON 方式，或者 ECharts 内置的 geo 坐标系简易版
-
-// ⭐ 如果你没有 china.json，ECharts 默认没法画地图轮廓。
-// 我们这里用一种“散点图 + 百度地图底图”的混合模式，或者简单的“地理坐标系”
-// 鉴于环境限制，我们先做一个“模拟雷达扫描”的效果，不需要下载地图包也能跑。
+import request from '../utils/request' // ⭐ 引入 request 获取真数据
+import { ElMessage } from 'element-plus'
 
 let myChart = null
 
-const initMap = () => {
+const initMap = (talentData) => {
   const chartDom = document.getElementById('chinaMap')
+  if (myChart) myChart.dispose()
   myChart = echarts.init(chartDom)
 
-  // 模拟的人才数据：[经度, 纬度, 强度]
-  const data = [
-    { name: '北京总部', value: [116.407526, 39.90403, 100] },
-    { name: '上海分部', value: [121.473701, 31.230416, 80] },
-    { name: '武汉研发中心', value: [114.305393, 30.593099, 60] },
-    { name: '深圳实验室', value: [114.057868, 22.543099, 90] },
-    { name: '成都办事处', value: [104.066541, 30.572269, 50] }
-  ]
+  // 1. 处理后端数据，转换成 ECharts 格式
+  // 过滤掉没有经纬度的人
+  const mapData = talentData
+    .filter(item => item.lng && item.lat)
+    .map(item => {
+      return {
+        name: item.name,
+        value: [item.lng, item.lat, item.csScore + item.medScore] // 第3个值用作气泡大小参考
+      }
+    })
 
   const option = {
-    backgroundColor: '#0E1C2F', // 深色背景，显高级
+    backgroundColor: '#0E1C2F',
     title: {
-      text: '全国人才分布热力图',
+      text: `共监控 ${mapData.length} 位人才位置`,
       left: 'center',
       textStyle: { color: '#fff' }
     },
     tooltip: {
       trigger: 'item',
       formatter: function (params) {
-        return `${params.name}<br/>人才密度: ${params.value[2]}`
+        // params.data.value[2] 是我们存的总分
+        return `<div style="font-weight:bold">${params.name}</div>坐标: [${params.value[0].toFixed(2)}, ${params.value[1].toFixed(2)}]`
       }
     },
-    // 地理坐标系组件
     geo: {
-      map: 'china', // ⭐ 注意：这需要引入中国地图数据。如果没有，图表会不显示地图轮廓
+      map: 'china',
       roam: true,
       label: { emphasis: { show: false } },
       itemStyle: {
-        normal: {
-          areaColor: '#142957',
-          borderColor: '#0692a4'
-        },
-        emphasis: {
-          areaColor: '#0b1c2d'
-        }
+        normal: { areaColor: '#142957', borderColor: '#0692a4' },
+        emphasis: { areaColor: '#0b1c2d' }
       }
     },
     series: [
       {
-        name: '人才分布',
-        type: 'effectScatter', // 带有涟漪特效动画的散点（气泡）
+        name: '人才',
+        type: 'effectScatter',
         coordinateSystem: 'geo',
-        data: data,
-        symbolSize: function (val) {
-          return val[2] / 4;
-        },
-        encode: {
-          value: 2
-        },
-        showEffectOn: 'render',
-        rippleEffect: {
-          brushType: 'stroke'
-        },
-        label: {
-          formatter: '{b}',
-          position: 'right',
-          show: true
-        },
-        itemStyle: {
-          color: '#f4e925',
-          shadowBlur: 10,
-          shadowColor: '#333'
-        },
-        zlevel: 1
+        data: mapData,
+        symbolSize: 10,
+        rippleEffect: { brushType: 'stroke' },
+        label: { formatter: '{b}', position: 'right', show: true, color: '#fff' },
+        itemStyle: { color: '#f4e925', shadowBlur: 10, shadowColor: '#333' },
       }
     ]
   };
 
-  // ⭐ 关键点：因为我们没有下载 china.json，ECharts 可能画不出底图。
-  // 为了保证你能看到东西，我们这里做一个“注册地图”的动作。
-  // 必须先获取地图 JSON。
-  
-  // 临时方案：从网上拉取 GeoJSON (需要联网)
+  // 2. 加载地图 JSON (这里还是用在线数据，为了保证显示)
   fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json')
-    .then(response => response.json())
+    .then(res => res.json())
     .then(geoJson => {
       echarts.registerMap('china', geoJson);
       myChart.setOption(option);
     })
-    .catch(err => {
-      console.error('地图加载失败', err)
-      // 如果加载失败，给个保底提示
-      chartDom.innerHTML = '<div style="color:white; text-align:center; padding-top:200px;">地图数据加载失败，请检查网络</div>'
+    .catch(() => {
+      // 离线保底方案：虽然没地图轮廓，但点还在
+      myChart.setOption(option); 
     });
+}
+
+// ⭐ 获取真实数据
+const fetchData = async () => {
+  try {
+    const res = await request.get('/api/talent/list')
+    if (res.code === '200') {
+        initMap(res.data)
+        ElMessage.success('位置数据已同步')
+    }
+  } catch (e) {
+    ElMessage.error('获取失败')
+  }
 }
 
 const resizeHandler = () => myChart?.resize()
 
 onMounted(() => {
-  initMap()
+  fetchData()
   window.addEventListener('resize', resizeHandler)
 })
 
@@ -129,6 +116,6 @@ onUnmounted(() => {
 
 <style scoped>
 .map-container { padding: 0; }
-.map-card { border: none; background: #0E1C2F; } /* 让卡片背景也变黑 */
+.map-card { border: none; background: #0E1C2F; }
 .card-header { color: white; display: flex; justify-content: space-between; align-items: center;}
 </style>
