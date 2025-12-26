@@ -10,7 +10,9 @@
         text-color="#bfcbd9"
       >
         <template v-if="userRole !== 'STUDENT'">
-          <el-menu-item index="/dashboard"><el-icon><Odometer /></el-icon>仪表盘</el-menu-item>
+          <el-menu-item index="/home"><el-icon><House /></el-icon>系统首页</el-menu-item>
+          
+          
           <el-menu-item index="/map"><el-icon><MapLocation /></el-icon>时空轨迹</el-menu-item>
           <el-menu-item index="/project"><el-icon><List /></el-icon>项目管理</el-menu-item>
           <el-menu-item index="/asset"><el-icon><Box /></el-icon>资产设备</el-menu-item>
@@ -46,9 +48,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Odometer, UserFilled, Notebook, Setting, MapLocation, List, Box, ArrowDown } from '@element-plus/icons-vue'
+// ⭐ 记得引入 House 图标
+import { Odometer, UserFilled, Notebook, Setting, MapLocation, List, Box, ArrowDown, House } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
@@ -62,9 +64,8 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-/* 请把原来 App.vue 里的 layout 样式复制到这里 (.layout-container, .aside, .header 等) */
 .layout-container { height: 100vh; }
 .aside { background-color: #304156; color: #fff; }
 .logo { height: 60px; line-height: 60px; text-align: center; color: #fff; font-weight: bold; font-size: 18px;}
-.header { background: #fff; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd;}
+.header { background: #fff; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding: 0 20px;}
 </style>

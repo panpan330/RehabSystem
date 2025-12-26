@@ -3,9 +3,10 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 // 引入组件
 import Login from '../components/Login.vue'
 import MainLayout from '../layout/MainLayout.vue'
+import Home from '../views/Home.vue' // ⭐ 引入你的新首页
 import Dashboard from '../components/Dashboard.vue'
-import TalentAdmin from '../views/TalentAdmin.vue' // 刚才拆分出来的
-import TalentView from '../components/TalentView.vue' // 学生端的个人中心
+import TalentAdmin from '../views/TalentAdmin.vue'
+import TalentView from '../components/TalentView.vue'
 import MapView from '../components/MapView.vue'
 import ProjectList from '../components/ProjectList.vue'
 import AssetList from '../components/AssetList.vue'
@@ -17,9 +18,12 @@ const routes = [
   { 
     path: '/', 
     component: MainLayout,
-    redirect: '/dashboard', // 默认跳去仪表盘
+    redirect: '/home', // ⭐ 修改重定向：默认跳去新首页
     children: [
-      { path: 'dashboard', component: Dashboard, meta: { title: '决策仪表盘' } },
+      // ⭐ 新增首页路由
+      { path: 'home', component: Home, meta: { title: '系统驾驶舱' } },
+      
+      
       { path: 'talent', component: TalentAdmin, meta: { title: '人才数据库' } },
       { path: 'map', component: MapView, meta: { title: '时空轨迹' } },
       { path: 'project', component: ProjectList, meta: { title: '科研项目' } },
@@ -37,7 +41,7 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫：没登录不让进
+// 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   if (to.path !== '/login' && !token) {
