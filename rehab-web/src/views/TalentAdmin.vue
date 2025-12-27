@@ -31,21 +31,33 @@
         <el-table-column prop="role" label="角色" width="120">
           <template #default="scope"><el-tag :type="getTagType(scope.row.role)">{{ scope.row.role }}</el-tag></template>
         </el-table-column>
+        
+        <el-table-column prop="username" label="关联账号" width="120">
+            <template #default="scope">
+                <el-tag v-if="scope.row.username" type="info" effect="plain">{{ scope.row.username }}</el-tag>
+                <span v-else style="color: #909399; font-size: 12px;">未关联</span>
+            </template>
+        </el-table-column>
 
-        <el-table-column label="CS能力" min-width="150">
+        <el-table-column label="CS能力" min-width="120">
           <template #default="scope"><el-progress :percentage="scope.row.csScore" :status="scope.row.csScore>80?'success':'warning'" :stroke-width="12" /></template>
         </el-table-column>
-        <el-table-column label="医学能力" min-width="150">
+        <el-table-column label="医学能力" min-width="120">
           <template #default="scope"><el-progress :percentage="scope.row.medScore" color="#f56c6c" :stroke-width="12" /></template>
         </el-table-column>
         
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="scope">
-            <el-button size="small" type="primary" plain @click="showRadar(scope.row)">档案</el-button>
-            <el-button size="small" type="warning" plain @click="openEditDialog(scope.row)">编辑</el-button>
+            <el-button size="small" type="primary" link @click="showRadar(scope.row)">档案</el-button>
+            <el-button size="small" type="primary" link @click="openEditDialog(scope.row)">编辑</el-button>
+            
+            <el-button size="small" type="warning" link @click="openResetDialog(scope.row)">
+               <el-icon><Key /></el-icon> 重置密码
+            </el-button>
+            
             <el-popconfirm title="确定删除？" @confirm="handleDelete(scope.row.id)">
               <template #reference>
-                <el-button size="small" type="danger" plain style="margin-left: 10px;">删除</el-button>
+                <el-button size="small" type="danger" link>删除</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -66,11 +78,9 @@
             </el-form-item>
           </el-col>
         </el-row>
-        
         <el-form-item label="身份证号">
             <el-input v-model="form.idCard" placeholder="请输入18位身份证号" />
         </el-form-item>
-
         <el-row :gutter="20">
           <el-col :span="12">
              <el-form-item label="出生日期">
@@ -87,7 +97,6 @@
             </el-form-item>
           </el-col>
         </el-row>
-
         <el-row :gutter="20">
            <el-col :span="12">
              <el-form-item label="学历">
@@ -100,16 +109,13 @@
            </el-col>
            <el-col :span="12"><el-form-item label="专业"><el-input v-model="form.major" /></el-form-item></el-col>
         </el-row>
-
         <el-row :gutter="20">
           <el-col :span="12"><el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item></el-col>
         </el-row>
-        
         <el-form-item label="家庭地址">
             <el-input v-model="form.address" type="textarea" :rows="2" placeholder="请输入详细居住地址" />
         </el-form-item>
-
         <el-divider content-position="center">能力评估</el-divider>
         <el-form-item label="CS能力"><el-slider v-model="form.csScore" show-input /></el-form-item>
         <el-form-item label="医学能力"><el-slider v-model="form.medScore" show-input /></el-form-item>
@@ -121,7 +127,7 @@
     </el-dialog>
 
     <el-dialog v-model="dialogVisible" title="人才综合电子档案" width="1100px" top="5vh" @opened="initChart">
-      <div style="background: #f5f7fa; padding: 20px; border-radius: 4px;">
+       <div style="background: #f5f7fa; padding: 20px; border-radius: 4px;">
         <el-card shadow="never" style="margin-bottom: 20px;">
           <template #header>
             <div class="card-header">
@@ -133,11 +139,9 @@
             <el-descriptions-item label="姓名">{{ currentTalent.name }}</el-descriptions-item>
             <el-descriptions-item label="性别">{{ currentTalent.gender || '-' }}</el-descriptions-item>
             <el-descriptions-item label="出生日期">{{ currentTalent.birthday || '-' }}</el-descriptions-item>
-            
             <el-descriptions-item label="身份证号">{{ currentTalent.idCard || '-' }}</el-descriptions-item>
             <el-descriptions-item label="手机号">{{ currentTalent.phone || '-' }}</el-descriptions-item>
             <el-descriptions-item label="电子邮箱">{{ currentTalent.email || '-' }}</el-descriptions-item>
-
             <el-descriptions-item label="最高学历">{{ currentTalent.education || '-' }}</el-descriptions-item>
             <el-descriptions-item label="专业方向">{{ currentTalent.major || '-' }}</el-descriptions-item>
             <el-descriptions-item label="家庭地址" :span="1">{{ currentTalent.address || '-' }}</el-descriptions-item>
@@ -185,7 +189,6 @@
           <el-button @click="dialogVisible = false">关闭</el-button>
         </span>
       </template>
-
       <el-divider content-position="left">📅 关联培训记录</el-divider>
       <el-table :data="trainingList" border size="small" style="width: 100%">
          <el-table-column prop="courseName" label="课程名称" />
@@ -197,6 +200,21 @@
          <el-table-column prop="createTime" label="时间" />
       </el-table>
     </el-dialog>
+
+    <el-dialog v-model="resetDialogVisible" title="🔐 重置登录密码" width="400px">
+      <el-form :model="resetForm" label-width="80px" style="padding-top: 20px;">
+        <el-form-item label="登录账号">
+           <el-input v-model="resetForm.username" placeholder="请输入登录账号" />
+        </el-form-item>
+        <el-form-item label="新密码">
+           <el-input v-model="resetForm.newPassword" placeholder="请输入新密码" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitReset">确认重置</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -205,7 +223,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import request from '../utils/request'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
-import { Download, Plus, Refresh, Upload } from '@element-plus/icons-vue' // ⭐ 记得引入 Upload 图标
+import { Download, Plus, Refresh, Upload, Key } from '@element-plus/icons-vue' 
 import ThreeBody from '../components/ThreeBody.vue' 
 import { exportToPDF } from '../utils/pdfExport'
 
@@ -226,6 +244,9 @@ const currentTalent = ref({})
 const trainingList = ref([])
 const analysisReport = ref({ type: '', colorType: 'info', summary: '', strength: '', weakness: '', courses: [] })
 let myChart = null
+
+const resetDialogVisible = ref(false)
+const resetForm = ref({ username: '', newPassword: '' })
 
 const getTagType = (role) => {
   if (role === 'DOCTOR') return 'success'
@@ -260,17 +281,15 @@ const fetchTraining = async (talentId) => {
 
 const exportTalentExcel = () => { window.location.href = 'http://localhost:9090/api/excel/export/talent' }
 
-// ⭐ 新增：上传成功回调
 const handleUploadSuccess = (res) => {
   if (res.code === '200') {
     ElMessage.success('导入成功！')
-    fetchData() // 刷新列表
+    fetchData()
   } else {
     ElMessage.error('导入失败: ' + res.msg)
   }
 }
 
-// ⭐ 新增：上传失败回调
 const handleUploadError = () => {
   ElMessage.error('上传网络错误')
 }
@@ -326,6 +345,37 @@ const showRadar = (row) => {
 }
 const handleExport = () => { ElMessage.success('正在生成 PDF...'); exportToPDF('report-content', `${currentTalent.value.name}-档案`) }
 
+// ⭐⭐ 修正：自动填入后端查出来的 username ⭐⭐
+const openResetDialog = (row) => {
+  resetForm.value = {
+    username: row.username || '', 
+    newPassword: ''
+  }
+  resetDialogVisible.value = true
+}
+
+// ⭐⭐ 提交重置请求 ⭐⭐
+const submitReset = async () => {
+  if (!resetForm.value.newPassword) return ElMessage.warning('请输入新密码')
+  if (!resetForm.value.username) return ElMessage.warning('请输入登录账号')
+
+  try {
+    const res = await request.post('/api/user/reset-password', {
+      username: resetForm.value.username,
+      newPassword: resetForm.value.newPassword
+    })
+    
+    if (res.code === '200') {
+      ElMessage.success(`账号 [${resetForm.value.username}] 密码已重置`)
+      resetDialogVisible.value = false
+    } else {
+      ElMessage.error(res.msg || '重置失败')
+    }
+  } catch (e) {
+    ElMessage.error('网络错误')
+  }
+}
+
 const generateReport = (cs, med) => {
   if (cs > 70 && med > 70) {
     analysisReport.value = { type: '🌟 卓越交叉型人才', colorType: 'success', summary: '双强精英', strength: '医工双修', weakness: '无', courses: ['科研项目管理'] }
@@ -356,19 +406,17 @@ const initChart = async () => {
 
 const assignTraining = async () => {
   if (analysisReport.value.courses.length === 0) {
-      ElMessage.info('当前没有推荐课程，请先调整分数');
+      ElMessage.info('当前没有推荐课程');
       return;
   }
-  
   try {
     const res = await request.post(`/api/training/auto-assign/${currentTalent.value.id}`)
-    
     if (res.code === '200') {
         const courses = res.data
         if (courses && courses.length > 0) {
             ElMessage.success(`AI 已智能指派 ${courses.length} 门课程！`)
         } else {
-            ElMessage.info('该人才已拥有推荐的课程，无需重复指派')
+            ElMessage.info('该人才已拥有推荐的课程')
         }
         fetchTraining(currentTalent.value.id)
     } else {
