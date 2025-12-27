@@ -1,71 +1,134 @@
 <template>
   <el-container class="layout-container">
-    <el-aside width="220px" class="aside">
-      <div class="logo">🏥 康复人才智脑</div>
+    <el-aside :width="isCollapse ? '64px' : '220px'" class="aside">
+      <div class="logo">
+        <img src="../assets/logo.svg" alt="logo" />
+        <span v-if="!isCollapse">康复智脑</span>
+      </div>
+      
       <el-menu
-        :router="true" 
-        :default-active="$route.path"
-        active-text-color="#409EFF"
-        background-color="#304156"
+        :default-active="route.path"
+        class="el-menu-vertical"
+        background-color="#0E1C2F"
         text-color="#bfcbd9"
+        active-text-color="#409EFF"
+        router
+        :collapse="isCollapse"
       >
-        <template v-if="userRole !== 'STUDENT'">
-          <el-menu-item index="/home"><el-icon><House /></el-icon>系统首页</el-menu-item>
+        <div v-if="isAdmin">
+          <el-menu-item index="/home">
+            <el-icon><House /></el-icon>
+            <template #title>系统驾驶舱</template>
+          </el-menu-item>
           
+          <el-menu-item index="/talent">
+            <el-icon><User /></el-icon>
+            <template #title>人才数据库</template>
+          </el-menu-item>
           
-          <el-menu-item index="/map"><el-icon><MapLocation /></el-icon>时空轨迹</el-menu-item>
-          <el-menu-item index="/project"><el-icon><List /></el-icon>项目管理</el-menu-item>
-          <el-menu-item index="/asset"><el-icon><Box /></el-icon>资产设备</el-menu-item>
-          <el-menu-item index="/training"><el-icon><Notebook /></el-icon>培训计划</el-menu-item>
-          <el-menu-item index="/talent"><el-icon><UserFilled /></el-icon>人才信息</el-menu-item>
-          <el-menu-item index="/settings"><el-icon><Setting /></el-icon>系统设置</el-menu-item>
-        </template>
-        
-        <template v-else>
-           <el-menu-item index="/personal"><el-icon><UserFilled /></el-icon>个人成长中心</el-menu-item>
-        </template>
+          <el-menu-item index="/map">
+            <el-icon><MapLocation /></el-icon>
+            <template #title>时空轨迹</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/project">
+            <el-icon><DataBoard /></el-icon>
+            <template #title>科研项目</template>
+          </el-menu-item>
+          
+          <el-menu-item index="/training">
+            <el-icon><Reading /></el-icon>
+            <template #title>培训计划</template>
+          </el-menu-item>
+
+          <el-menu-item index="/settings">
+            <el-icon><Setting /></el-icon>
+            <template #title>设置</template>
+          </el-menu-item>
+        </div>
+
+        <el-menu-item index="/personal">
+          <el-icon><UserFilled /></el-icon>
+          <template #title>个人成长中心</template>
+        </el-menu-item>
+
+        <el-menu-item index="/asset">
+          <el-icon><Box /></el-icon>
+          <template #title>设备借用中心</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
     <el-container>
       <el-header class="header">
-        <div class="breadcrumb">当前位置 / {{ $route.meta.title }}</div>
-        <div class="user-info">
-          <el-dropdown @command="handleLogout">
-            <span style="cursor: pointer;">{{ userInfo.name }} <el-icon><ArrowDown /></el-icon></span>
+        <div class="header-left">
+          <el-icon class="fold-btn" @click="isCollapse = !isCollapse">
+            <Fold v-if="!isCollapse" />
+            <Expand v-else />
+          </el-icon>
+        </div>
+        
+        <div class="header-right">
+          <el-dropdown>
+            <span class="el-dropdown-link">
+              <el-avatar :size="32" :src="userInfo.avatar || 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png'" />
+              <span class="username">{{ userInfo.name || userInfo.username || '用户' }}</span>
+              <el-icon class="el-icon--right"><arrow-down /></el-icon>
+            </span>
             <template #dropdown>
-              <el-dropdown-menu><el-dropdown-item command="logout">退出登录</el-dropdown-item></el-dropdown-menu>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="router.push('/personal')">个人中心</el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
       </el-header>
 
-      <el-main style="background: #f0f2f5;">
-        <router-view />
+      <el-main class="main-content">
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
-// ⭐ 记得引入 House 图标
-import { Odometer, UserFilled, Notebook, Setting, MapLocation, List, Box, ArrowDown, House } from '@element-plus/icons-vue'
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { 
+  House, User, MapLocation, DataBoard, Box, Reading, 
+  UserFilled, Setting, Fold, Expand, ArrowDown 
+} from '@element-plus/icons-vue'
 
 const router = useRouter()
+const route = useRoute()
+const isCollapse = ref(false)
+
 const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-const userRole = userInfo.role
+const isAdmin = computed(() => userInfo && userInfo.role === 'ADMIN')
 
 const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('userInfo')
+  localStorage.clear()
   router.push('/login')
 }
 </script>
 
 <style scoped>
 .layout-container { height: 100vh; }
-.aside { background-color: #304156; color: #fff; }
-.logo { height: 60px; line-height: 60px; text-align: center; color: #fff; font-weight: bold; font-size: 18px;}
-.header { background: #fff; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding: 0 20px;}
+.aside { background-color: #0E1C2F; color: #fff; transition: width 0.3s; overflow-x: hidden; display: flex; flex-direction: column; }
+.logo { height: 60px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; color: #fff; background-color: #0b1625; white-space: nowrap; }
+.logo img { width: 30px; margin-right: 10px; }
+.el-menu-vertical { border-right: none; }
+.header { background-color: #fff; border-bottom: 1px solid #e6e6e6; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+.fold-btn { font-size: 20px; cursor: pointer; color: #606266; }
+.fold-btn:hover { color: #409EFF; }
+.header-right .el-dropdown-link { display: flex; align-items: center; cursor: pointer; outline: none; }
+.username { margin-left: 10px; font-weight: 500; color: #606266; }
+.main-content { background-color: #f0f2f5; padding: 20px; overflow-y: auto; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
