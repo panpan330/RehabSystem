@@ -29,14 +29,14 @@
             <el-descriptions-item label="🏠 地址">{{ myProfile.address || '-' }}</el-descriptions-item>
           </el-descriptions>
 
-          <div style="margin-top: 20px; text-align: center;">
+          <div style="margin-top: 20px; text-align: center; display: flex; justify-content: center; gap: 10px;">
             <el-button type="primary" plain round @click="editDialogVisible = true">✏️ 编辑资料</el-button>
+            <el-button type="warning" plain round @click="passDialogVisible = true">🔑 修改密码</el-button>
           </div>
         </el-card>
       </el-col>
 
       <el-col :span="16">
-        
         <el-card shadow="hover" style="margin-bottom: 20px;">
           <template #header>
             <div class="card-header">
@@ -44,9 +44,7 @@
               <el-tag effect="plain" round>{{ myProjects.length }} 个参与中</el-tag>
             </div>
           </template>
-
-          <el-empty v-if="myProjects.length === 0" description="暂未参与任何项目，快去找导师申请吧！" :image-size="80" />
-
+          <el-empty v-if="myProjects.length === 0" description="暂未参与任何项目" :image-size="80" />
           <div v-else class="project-list">
              <div v-for="proj in myProjects" :key="proj.id" class="project-item">
                 <div class="project-icon">🧪</div>
@@ -60,11 +58,6 @@
                    <div class="project-role">
                       <el-icon><User /></el-icon> 我的角色：<span style="color: #409EFF; font-weight: bold;">{{ proj.myRole }}</span>
                    </div>
-                   <div class="project-desc">{{ proj.description || '暂无描述' }}</div>
-                </div>
-                <div class="project-dates">
-                   <div class="date-tag">起 {{ formatDate(proj.start_date) }}</div>
-                   <div class="date-tag">止 {{ formatDate(proj.end_date) }}</div>
                 </div>
              </div>
           </div>
@@ -77,9 +70,7 @@
               <el-tag type="warning" round>{{ myTasks.length }} 个待办</el-tag>
             </div>
           </template>
-          
-          <el-empty v-if="myTasks.length === 0 && myDoneTasks.length === 0" description="暂无任务，真是轻松的一天~" :image-size="80" />
-          
+          <el-empty v-if="myTasks.length === 0 && myDoneTasks.length === 0" description="暂无任务" :image-size="80" />
           <div v-else class="task-list">
             <div v-for="task in myTasks" :key="task.id" class="task-item">
               <div class="task-icon">📖</div>
@@ -90,8 +81,7 @@
               <el-button type="primary" size="small" round @click="startTask(task)" v-if="task.status === 'TO_DO'">开始学习</el-button>
               <el-button type="success" size="small" round @click="finishTask(task)" v-if="task.status === 'IN_PROGRESS'">标记完成</el-button>
             </div>
-            
-             <el-collapse v-if="myDoneTasks.length > 0" style="margin-top: 10px; border:none">
+            <el-collapse v-if="myDoneTasks.length > 0" style="margin-top: 10px; border:none">
               <el-collapse-item title="查看已完成的历史任务" name="1">
                 <div v-for="task in myDoneTasks" :key="task.id" class="task-item done">
                   <div class="task-icon">✅</div>
@@ -109,8 +99,7 @@
               <el-button type="primary" link @click="$router.push('/asset')">去借设备</el-button>
             </div>
           </template>
-          
-          <el-table :data="myAssets" style="width: 100%" empty-text="两袖清风，快去借点设备做实验吧~">
+          <el-table :data="myAssets" style="width: 100%" empty-text="暂无借用设备">
             <el-table-column prop="deviceName" label="设备名称" />
             <el-table-column prop="deviceCode" label="编号" width="120" />
             <el-table-column label="状态" width="100">
@@ -139,6 +128,24 @@
         <el-button type="primary" @click="saveProfile">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="passDialogVisible" title="修改密码" width="400px">
+      <el-form :model="passForm" label-width="80px">
+        <el-form-item label="旧密码">
+           <el-input v-model="passForm.oldPass" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="新密码">
+           <el-input v-model="passForm.newPass" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="确认新密码">
+           <el-input v-model="passForm.confirmPass" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="passDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPass">确认修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -149,60 +156,47 @@ import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { useRouter } from 'vue-router' // 引入路由
 
+const router = useRouter()
 const myProfile = ref({})
 const allTraining = ref([])
 const allAssets = ref([])
-const myProjects = ref([]) // ⭐ 新增：项目列表
+const myProjects = ref([])
 const editDialogVisible = ref(false)
 const editForm = ref({})
 let radarChart = null
 const today = dayjs().format('YYYY年MM月DD日')
 
+// ⭐ 密码相关数据
+const passDialogVisible = ref(false)
+const passForm = ref({ oldPass: '', newPass: '', confirmPass: '' })
+
 const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
 const userId = userInfo.id
 
-// 计算属性
 const myTasks = computed(() => allTraining.value.filter(t => t.status !== 'DONE'))
 const myDoneTasks = computed(() => allTraining.value.filter(t => t.status === 'DONE'))
 const myAssets = computed(() => allAssets.value.filter(a => a.borrowerId == userId && a.status === 'BORROWED'))
 
 const initData = async () => {
   if (!userId) return ElMessage.error('未登录状态')
-  
   try {
-    // 1. 查档案
     const resProfile = await request.get(`/api/talent/profile/${userId}`)
     if (resProfile.code === '200') {
       myProfile.value = resProfile.data
       editForm.value = { ...resProfile.data }
       renderRadar()
-      
       const talentId = myProfile.value.id
       if (talentId) {
-        // 2. 查任务
-        const resTrain = await request.get(`/api/training/list`)
-        // 假设 training list 接口如果是全量，需要前端过滤，或者后端有 /list/{talentId}
-        // 这里为了兼容之前代码，假设返回全部，我们前端过滤 (如果是全量接口)
-        // 更好的是后端提供 /api/training/listMy，但这里简单起见：
-        if (resTrain.code === '200') {
-            // 如果接口返回全部，需要过滤 belong to me。如果接口没变，这里过滤逻辑视你的 TrainingController 而定
-            // 假设 TrainingController 没改，这里简单过滤下 name (不太严谨) 或者直接用
-             allTraining.value = resTrain.data.filter(t => t.talentId === talentId)
-        }
-
-        // ⭐ 3. 新增：查我的项目
+        const resTrain = await request.get(`/api/training/list/${talentId}`)
+        if (resTrain.code === '200') allTraining.value = resTrain.data
         const resProj = await request.get(`/api/project/list/my/${talentId}`)
-        if (resProj.code === '200') {
-            myProjects.value = resProj.data
-        }
+        if (resProj.code === '200') myProjects.value = resProj.data
       }
     }
-
-    // 4. 查资产
     const resAsset = await request.get('/api/asset/list')
     if(resAsset.code === '200') allAssets.value = resAsset.data
-
   } catch (e) { console.error(e) }
 }
 
@@ -238,7 +232,6 @@ const renderRadar = () => {
   })
 }
 
-// 任务操作
 const startTask = async (task) => {
   await request.post('/api/training/update-status', { id: task.id, status: 'IN_PROGRESS' })
   task.status = 'IN_PROGRESS'
@@ -249,59 +242,64 @@ const finishTask = async (task) => {
   task.status = 'DONE'
   ElMessage.success('任务完成')
 }
-
-// 资产操作
 const returnAsset = async (row) => {
     await request.post('/api/asset/return', { assetId: row.id })
     ElMessage.success('归还成功')
-    const res = await request.get('/api/asset/list') // 刷新
+    const res = await request.get('/api/asset/list')
     allAssets.value = res.data
 }
-
 const saveProfile = async () => {
     await request.put('/api/talent/update', editForm.value)
     myProfile.value = { ...editForm.value }
     editDialogVisible.value = false
     ElMessage.success('更新成功')
 }
-
 const formatDate = (str) => str ? str.split('T')[0] : '-'
+
+// ⭐ 提交修改密码
+const submitPass = async () => {
+    if (!passForm.value.oldPass || !passForm.value.newPass) {
+        return ElMessage.warning('请输入密码')
+    }
+    if (passForm.value.newPass !== passForm.value.confirmPass) {
+        return ElMessage.warning('两次新密码输入不一致')
+    }
+    try {
+        const res = await request.post('/api/user/password', {
+            userId: userId,
+            oldPass: passForm.value.oldPass,
+            newPass: passForm.value.newPass
+        })
+        if (res.code === '200') {
+            ElMessage.success('密码修改成功，请重新登录')
+            passDialogVisible.value = false
+            // 退出登录
+            localStorage.clear()
+            router.push('/login')
+        } else {
+            ElMessage.error(res.msg || '修改失败')
+        }
+    } catch(e) { ElMessage.error('网络错误') }
+}
 
 onMounted(() => initData())
 </script>
 
 <style scoped>
 .user-center { padding: 20px; background: #f0f2f5; min-height: 100vh; }
-.welcome-header {
-  background: linear-gradient(135deg, #409EFF 0%, #3a8ee6 100%);
-  padding: 30px 40px 60px 40px;
-  color: white; border-radius: 8px; margin-bottom: 20px;
-  display: flex; justify-content: space-between; align-items: center;
-}
+.welcome-header { background: linear-gradient(135deg, #409EFF 0%, #3a8ee6 100%); padding: 30px 40px 60px 40px; color: white; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
 .welcome-text h2 { margin: 0 0 10px 0; }
 .welcome-text p { margin: 0; opacity: 0.9; }
-
 .profile-card { text-align: center; }
 .avatar-area { padding: 10px; }
 .info-desc :deep(.el-descriptions__label) { width: 70px; text-align: right; }
-
 .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
-
-/* 项目列表样式 */
 .project-list { display: flex; flex-direction: column; gap: 15px; }
-.project-item {
-    display: flex; align-items: center;
-    background: #f8f9fa; padding: 15px; border-radius: 8px;
-    border-left: 4px solid #409EFF; /* 左侧蓝条 */
-}
+.project-item { display: flex; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #409EFF; }
 .project-icon { font-size: 24px; margin-right: 15px; }
 .project-info { flex: 1; }
 .project-title { font-weight: bold; font-size: 15px; display: flex; align-items: center; }
 .project-role { font-size: 13px; color: #606266; margin: 5px 0; display: flex; align-items: center; gap: 5px;}
-.project-desc { font-size: 12px; color: #909399; }
-.project-dates { text-align: right; font-size: 12px; color: #909399; }
-
-/* 任务列表样式 */
 .task-item { display: flex; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
 .task-item.done { opacity: 0.6; background: #fff; border: 1px solid #eee; }
 .task-icon { font-size: 24px; margin-right: 15px; }
